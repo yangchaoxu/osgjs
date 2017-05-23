@@ -2,7 +2,6 @@
 var Camera = require( 'osg/Camera' );
 var CullVisitor = require( 'osg/CullVisitor' );
 var BlendFunc = require( 'osg/BlendFunc' );
-var ComputeBoundsVisitor = require( 'osg/ComputeBoundsVisitor' );
 var Depth = require( 'osg/Depth' );
 var FrameBufferObject = require( 'osg/FrameBufferObject' );
 var mat4 = require( 'osg/glMatrix' ).mat4;
@@ -23,7 +22,6 @@ var Viewport = require( 'osg/Viewport' );
 var WebGLCaps = require( 'osg/WebGLCaps' );
 var ShadowReceiveAttribute = require( 'osgShadow/ShadowReceiveAttribute' );
 var ShadowCasterVisitor = require( 'osgShadow/ShadowCasterVisitor' );
-var ShadowFrustumIntersection = require( 'osgShadow/ShadowFrustumIntersection' );
 var ShadowCastAttribute = require( 'osgShadow/ShadowCastAttribute' );
 var ShadowTechnique = require( 'osgShadow/ShadowTechnique' );
 var ShadowTexture = require( 'osgShadow/ShadowTexture' );
@@ -151,9 +149,6 @@ var ShadowMap = function ( settings, shadowTexture ) {
 
     if ( settings )
         this.setShadowSettings( settings );
-
-    this._computeFrustumBounds = new ShadowFrustumIntersection();
-    this._computeBoundsVisitor = new ComputeBoundsVisitor();
 
     // Overridable Visitor so that user can override the visitor to enable disable
     // in its own shadowmap implementation
@@ -962,7 +957,7 @@ ShadowMap.prototype = MACROUTILS.objectLibraryClass( MACROUTILS.objectInherit( S
         // do RTT from the camera traversal mimicking light pos/orient
         this._cameraShadow.accept( cullVisitor );
 
-        // make sure no negative near 
+        // make sure no negative near
         this.nearFarBounding();
 
         // Here culling is done, we do have near/far.

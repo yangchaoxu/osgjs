@@ -6,6 +6,7 @@ var NodeVisitor = require( 'osg/NodeVisitor' );
 var StateSet = require( 'osg/StateSet' );
 var MACROUTILS = require( 'osg/Utils' );
 var vec4 = require( 'osg/glMatrix' ).vec4;
+var ComputeBoundsVisitor = require( 'osg/ComputeBoundsVisitor' );
 
 
 /**
@@ -27,6 +28,18 @@ var ShadowedScene = function () {
     this._tmpMat = mat4.create();
 
     this._receivingStateset = new StateSet();
+
+    this._computeBoundsVisitor = new ComputeBoundsVisitor();
+
+    this._castsShadowDrawTraversalMask = 0xffffffff;
+    this._castsShadowBoundsTraversalMask = 0xffffffff;
+
+    var settings;
+    if ( settings && settings.userShadowCasterVisitor !== false ) {
+
+        this._removeNodesNeverCastingVisitor = settings.userShadowCasterVisitor || new ShadowCasterVisitor( this._castsShadowTraversalMask );
+
+    }
 
 };
 
@@ -87,6 +100,67 @@ ShadowedScene.prototype = MACROUTILS.objectLibraryClass( MACROUTILS.objectInheri
         Node.prototype.traverse.call( this, nv );
     },
 
+    computeShadowedSceneBounds: function ( cullVisitor ) {
+
+        var bbox;
+
+        if ( this._removeNodesNeverCastingVisitor ) {
+
+            this._removeNodesNeverCastingVisitor.setNoCastMask( ~( this._castsShadowBoundsTraversalMask | this._castsShadowDrawTraversalMask ) );
+            this._removeNodesNeverCastingVisitor.reset();
+            this.accept( this._removeNodesNeverCastingVisitor );
+
+        }
+
+        this._computeBoundsVisitor.setTraversalMask( this._castsShadowBoundsTraversalMask );
+        this._computeBoundsVisitor.reset();
+        this.accept( this._computeBoundsVisitor );
+        bbox = this._computeBoundsVisitor.getBoundingBox();
+
+        if ( !bbox.valid() ) {
+
+            // nothing to draw Early out.
+            this.noDraw();
+
+            if ( this._removeNodesNeverCastingVisitor ) {
+
+                // remove our flags changes on any bitmask
+                // not to break things
+                this._removeNodesNeverCastingVisitor.restore();
+
+            }
+
+            return;
+
+        }
+
+
+        if ( this._debug ) {
+
+            var min = bbox.getMin();
+            var max = bbox.getMax();
+            bbox.center( this._tmpVec );
+            var matrix = this._debugNodeSceneCast.getMatrix();
+
+            mat4.fromScaling( matrix, [ max[ 0 ] - min[ 0 ],
+                max[ 1 ] - min[ 1 ],
+                max[ 2 ] - min[ 2 ], 1
+            ] );
+            mat4.setTranslation( matrix,
+                this._tmpVec );
+
+        }
+
+        // HERE we get the shadowedScene Current World Matrix
+        // to get any world transform ABOVE the shadowedScene
+        var worldMatrix = cullVisitor.getCurrentModelMatrix();
+        // it does fuck up the results.
+        bbox.transformMat4( bbox, worldMatrix );
+
+
+        return bbox;
+    },
+
     traverse: function ( nv ) {
 
         // update the scene
@@ -98,6 +172,27 @@ ShadowedScene.prototype = MACROUTILS.objectLibraryClass( MACROUTILS.objectInheri
             if ( lt ) nv.pushStateSet( this._receivingStateset );
             this.nodeTraverse( nv );
             if ( lt ) nv.popStateSet();
+
+            var isDirty = false;
+            for ( i = 0; i < lt; i++ ) {
+                st = this._shadowTechniques[ i ];
+
+                // dirty check for user playing with shadows inside update traverse
+                if ( !st || !st.valid() ) continue;
+                if ( st.isDirty() ) {
+                    isDirty = true;
+                    break;
+                }
+
+                if ( st.isEnabled() || !st.isFilledOnce() ) {
+                    isDirty = true;
+                    break;
+                }
+            }
+            if ( !isDirty ) return;
+
+            var bbox = this.computeShadowedSceneBounds( nv );
+            if ( !bbox ) return;
 
             // cull Casters
             for ( i = 0; i < lt; i++ ) {
@@ -112,9 +207,10 @@ ShadowedScene.prototype = MACROUTILS.objectLibraryClass( MACROUTILS.objectInheri
                     if ( st.isDirty() )
                         st.init();
 
+
                     if ( st.isEnabled() || !st.isFilledOnce() ) {
                         st.updateShadowTechnique( nv );
-                        st.cullShadowCasting( nv );
+                        st.cullShadowCasting( nv, bbox );
                     }
                 }
             }
