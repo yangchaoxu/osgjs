@@ -441,7 +441,8 @@ var CompilerFragment = {
 
     getOutputsFromLight: function () {
         var outputs = {
-            color: this.createVariable( 'vec3' ),
+            diffuseOut: this.createVariable( 'vec3' ),
+            specularOut: this.createVariable( 'vec3' ),
             lighted: this.createVariable( 'bool' ),
         };
 
@@ -458,7 +459,21 @@ var CompilerFragment = {
     },
 
     createLighting: function () {
-        var lightSum = [];
+        if ( this._lights.length === 0 ) return undefined;
+
+        var res = this.getLightingSeparate();
+        var output = this.createVariable( 'vec3' );
+        this.getNode( 'Add' ).inputs( res.diffuse, res.specular ).outputs( output );
+
+        return output;
+    },
+
+    getLightingSeparate: function () {
+        if ( this._lights.length === 0 ) return undefined;
+
+        // return contribution of diffuse and specular lights
+        var diffuseSum = [];
+        var specularSum = [];
 
         var enumToNodeName = this.getEnumLightToNodeName();
         for ( var i = 0; i < this._lights.length; i++ ) {
@@ -471,25 +486,39 @@ var CompilerFragment = {
 
             this.getNode( nodeName ).inputs( inputs ).outputs( outputs );
 
-            var finalLight = outputs.color;
+            var diffuseOut = outputs.diffuseOut;
+            var specularOut = outputs.specularOut;
 
             var shadowFactor = this.createShadowingLight( light, outputs.lighted );
             if ( shadowFactor ) {
-                finalLight = this.createVariable( 'vec3' );
-                this.getNode( 'Mult' ).inputs( outputs.color, shadowFactor ).outputs( finalLight );
+                diffuseOut = this.createVariable( 'vec3' );
+                this.getNode( 'Mult' ).inputs( outputs.diffuseOut, shadowFactor ).outputs( diffuseOut );
+
+                specularOut = this.createVariable( 'vec3' );
+                this.getNode( 'Mult' ).inputs( outputs.specularOut, shadowFactor ).outputs( specularOut );
             }
 
-            lightSum.push( finalLight );
+            diffuseSum.push( diffuseOut );
+            specularSum.push( specularOut );
         }
 
-        this.addAmbientLighting( lightSum );
+        var finalDiffuse;
+        var finalSpecular;
+        if ( this._lights.length === 1 ) {
+            finalDiffuse = diffuseSum[ 0 ];
+            finalSpecular = specularSum[ 0 ];
+        } else {
+            finalDiffuse = this.createVariable( 'vec3' );
+            this.getNode( 'Add' ).inputs( diffuseSum ).outputs( finalDiffuse );
 
-        if ( lightSum.length === 0 ) return this.getOrCreateConstantZero( 'vec3' );
-        if ( lightSum.length === 1 ) return lightSum[ 0 ];
+            finalSpecular = this.createVariable( 'vec3' );
+            this.getNode( 'Add' ).inputs( specularSum ).outputs( finalDiffuse );
+        }
 
-        var output = this.createVariable( 'vec3' );
-        this.getNode( 'Add' ).inputs( lightSum ).outputs( output );
-        return output;
+        return {
+            diffuse: finalDiffuse,
+            specular: finalSpecular
+        };
     },
 
     addAmbientLighting: function ( toBeAdded ) {

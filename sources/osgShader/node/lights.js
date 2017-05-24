@@ -11,7 +11,7 @@ var NodeLights = function () {
 
 NodeLights.prototype = MACROUTILS.objectInherit( Node.prototype, {
 
-    validOutputs: [ 'color', 'lighted' ],
+    validOutputs: [ 'diffuseOut', 'specularOut', 'lighted' ],
 
     globalFunctionDeclaration: function () {
         return '#pragma include "lights.glsl"';
@@ -48,7 +48,7 @@ PointLight.prototype = MACROUTILS.objectInherit( NodeLights.prototype, {
 
     computeShader: function () {
 
-        return shaderUtils.callFunction( 'computePointLightShading', this._outputs.color, [
+        return shaderUtils.callFunction( 'computePointLightShading', undefined, [
             this._inputs.normal,
             this._inputs.eyeVector,
 
@@ -62,6 +62,8 @@ PointLight.prototype = MACROUTILS.objectInherit( NodeLights.prototype, {
             this._inputs.lightattenuation,
             this._inputs.lightmatrix,
 
+            this._outputs.diffuseOut,
+            this._outputs.specularOut,
             this._outputs.lighted
         ] );
     }
@@ -99,7 +101,7 @@ SpotLight.prototype = MACROUTILS.objectInherit( NodeLights.prototype, {
 
     computeShader: function () {
 
-        return shaderUtils.callFunction( 'computeSpotLightShading', this._outputs.color, [
+        return shaderUtils.callFunction( 'computeSpotLightShading', undefined, [
             this._inputs.normal,
             this._inputs.eyeVector,
 
@@ -117,6 +119,8 @@ SpotLight.prototype = MACROUTILS.objectInherit( NodeLights.prototype, {
             this._inputs.lightmatrix,
             this._inputs.lightinvMatrix,
 
+            this._outputs.diffuseOut,
+            this._outputs.specularOut,
             this._outputs.lighted
         ] );
     }
@@ -148,7 +152,7 @@ SunLight.prototype = MACROUTILS.objectInherit( NodeLights.prototype, {
 
     computeShader: function () {
 
-        return shaderUtils.callFunction( 'computeSunLightShading', this._outputs.color, [
+        return shaderUtils.callFunction( 'computeSunLightShading', undefined, [
             this._inputs.normal,
             this._inputs.eyeVector,
 
@@ -161,6 +165,8 @@ SunLight.prototype = MACROUTILS.objectInherit( NodeLights.prototype, {
             this._inputs.lightposition,
             this._inputs.lightmatrix,
 
+            this._outputs.diffuseOut,
+            this._outputs.specularOut,
             this._outputs.lighted
         ] );
     }
@@ -190,7 +196,7 @@ HemiLight.prototype = MACROUTILS.objectInherit( NodeLights.prototype, {
 
     computeShader: function () {
 
-        return shaderUtils.callFunction( 'computeHemiLightShading', this._outputs.color, [
+        return shaderUtils.callFunction( 'computeHemiLightShading', undefined, [
             this._inputs.normal, this._inputs.eyeVector,
 
             getVec3( this._inputs.materialdiffuse ),
@@ -202,6 +208,8 @@ HemiLight.prototype = MACROUTILS.objectInherit( NodeLights.prototype, {
             this._inputs.lightposition,
             this._inputs.lightmatrix,
 
+            this._outputs.diffuseOut,
+            this._outputs.specularOut,
             this._outputs.lighted
         ] );
     }
